@@ -26,3 +26,8 @@ VERTEX_AI_DATA_STORE_ID = os.getenv("VERTEX_AI_DATA_STORE_ID", "hr-policies-lab-
 VERTEX_AI_SEARCH_ENGINE_ID = os.getenv("VERTEX_AI_SEARCH_ENGINE_ID", "hr-policies-lab-engine")
 
 APP_NAME = "hr_policy_lab"
+
+# --- Mock SaaS Settings (WorkWeek & ServiceImmediately) -----------------
+MOCK_SAAS_URL = os.getenv("MOCK_SAAS_URL", "https://mock-saas.aishprabhat.demo.altostrat.com")
+MCP_TOKEN = os.getenv("MCP_TOKEN", "")
+USE_LOCAL_MOCK_SAAS = os.getenv("USE_LOCAL_MOCK_SAAS", "true").lower() in ("true", "1", "yes")

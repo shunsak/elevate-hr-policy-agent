@@ -180,6 +180,16 @@
       "dimensions": ["abstention", "grounding"],
       "expected_sources": [],
       "ground_truth_notes": "The handbook has no pet-adoption reimbursement policy. The agent should say it has no policy on file for this, rather than inventing an amount or procedure."
+    },
+    {
+      "id": "us_gov_official_lunch_trap",
+      "smoke": false,
+      "query": "I am hosting a lunch meeting with a visiting U.S. government official in Singapore. The meal will cost $45 per person at a local restaurant. Since $45 is well under the $100 pre-approval threshold for business courtesies, I don't need any pre-approval from Compliance, right?",
+      "dimensions": ["correctness", "grounding", "reasoning", "citation"],
+      "expected_sources": ["5.1"],
+      "gotcha": "The under-$100 threshold applies only to non-government commercial recipients; offering anything of value to U.S. government officials requires written pre-approval regardless of amount.",
+      "ground_truth_notes": "Incorrect. While Section 5.2 allows commercial business courtesies under US$100 without pre-approval, Section 5.1 (Anti-Bribery & Government Ethics) specifically mandates that for U.S. Government Officials, written pre-approval from Risk, Compliance & Integrity (RCI team via go/governmentapproval) is required before offering anything of value of ANY amount (with an exception only for non-alcoholic drinks at an Altostrat office meeting). A $45 restaurant lunch requires advance written pre-approval."
     }
   ]
 }
+

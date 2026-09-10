@@ -1,28 +1,24 @@
-"""HR Policy Agent — entry point.
+"""HR Policy & Enterprise SaaS Agent — エントリーポイント.
 
-The runner/session/CLI plumbing below is GIVEN. Your job is the one marked block:
-build the `root_agent`. You will also implement the tools it uses
-(agent/tools/*.py) and its instructions (agent/prompt.py).
-
-Run it:
-    uv run python -m agent.agent "How many days of paid outpatient sick leave do I get?"
-    uv run python -m agent.agent --interactive
-    uv run adk web .            # then pick "agent" in the web UI
+規程検索 (OKF/RAG) に加え、WorkWeek (HCM) および ServiceImmediately (ITSM) を統合した
+エンタープライズ対応のオーケストレーターです。
 """
 import asyncio
+import re
 import sys
+from typing import Any, Dict, List, Tuple
 
-from google.adk.agents import LlmAgent  # noqa: F401  (used in the TODO block)
+from google.adk.agents import LlmAgent
 
 from . import config
 from .prompt import POLICY_AGENT_PROMPT
 
 
 # ---------------------------------------------------------------------------
-# GIVEN: tool selection. Picks the retrieval "brain" based on RETRIEVAL_MODE.
+# ツール選定ロジック: 規程検索 + WorkWeek + ServiceImmediately
 # ---------------------------------------------------------------------------
 def select_tools(mode: str):
-    """Return the list of tool callables for the given retrieval mode."""
+    """指定された検索モードに応じた規程検索ツールおよび SaaS 連携ツールを返却します。"""
     tools = []
     if mode in ("okf", "hybrid"):
         from .tools.okf_tool import list_concepts, read_concept
@@ -31,33 +27,80 @@ def select_tools(mode: str):
         from .tools.rag_tool import search_policy_docs
         tools += [search_policy_docs]
     if not tools:
-        raise ValueError(f"Unknown RETRIEVAL_MODE: {mode!r} (use okf | rag | hybrid)")
+        raise ValueError(f"未知の RETRIEVAL_MODE です: {mode!r} (okf | rag | hybrid を指定してください)")
+
+    # WorkWeek (HCM) ツール群
+    from .tools.workweek_tool import (
+        cancel_leave_request,
+        get_employee_profile,
+        get_leave_balance,
+        submit_leave_request,
+        update_contact_info,
+    )
+    # ServiceImmediately (ITSM) ツール群
+    from .tools.serviceimmediately_tool import (
+        add_ticket_comment,
+        create_incident_ticket,
+        get_ticket_details,
+        update_ticket_status,
+        void_incident_ticket,
+    )
+
+    tools += [
+        get_employee_profile,
+        update_contact_info,
+        get_leave_balance,
+        submit_leave_request,
+        cancel_leave_request,
+        get_ticket_details,
+        create_incident_ticket,
+        add_ticket_comment,
+        update_ticket_status,
+        void_incident_ticket,
+    ]
     return tools
 
 
+# ---------------------------------------------------------------------------
+# インプロセス・軽量多層防御ガードレール (SLA < 50ms)
+# ---------------------------------------------------------------------------
+_CREDIT_CARD_REGEX = re.compile(r"\b(?:\d[ -]*?){13,16}\b")
+_PROMPT_INJECTION_PATTERNS = [
+    re.compile(r"ignore\s+(all\s+)?(prior|previous)\s+instructions", re.IGNORECASE),
+    re.compile(r"system\s+prompt\s+leak", re.IGNORECASE),
+    re.compile(r"reveal\s+(the\s+)?(system|developer)\s+prompt", re.IGNORECASE),
+    re.compile(r"これまでの指示を(すべて|全部)?無視", re.IGNORECASE),
+]
+
+
+def apply_input_guardrail(query: str) -> Tuple[bool, str]:
+    """入力に対するプロンプトインジェクション検知を行います。"""
+    for pattern in _PROMPT_INJECTION_PATTERNS:
+        if pattern.search(query):
+            return False, "セキュリティポリシーに基づき、システム命令の変更やプロンプトの開示を求めるリクエストは処理できません。"
+    return True, query
+
+
+def apply_output_guardrail(response_text: str) -> str:
+    """出力に対する PII（クレジットカード番号等）マスキングを行います。"""
+    masked = _CREDIT_CARD_REGEX.sub("[REDACTED_CARD_NUMBER]", response_text)
+    return masked
+
+
 # ===========================================================================
-# TODO(you): Build the HR Policy Agent.
-#
-# Construct an ADK LlmAgent and assign it to `root_agent`. It should use:
-#   - model:       config.GEMINI_MODEL
-#   - name:        a short identifier, e.g. "hr_policy_agent"
-#   - description: one line describing what it does
-#   - instruction: POLICY_AGENT_PROMPT  (you write this in agent/prompt.py)
-#   - tools:       select_tools(config.RETRIEVAL_MODE)
-#
-# HINT: from google.adk.agents import LlmAgent  (already imported above)
-#       root_agent = LlmAgent(model=..., name=..., description=..., instruction=..., tools=...)
-#
-# Suggested coding-agent prompt:
-#   "In agent/agent.py, build an ADK LlmAgent named hr_policy_agent using
-#    config.GEMINI_MODEL, POLICY_AGENT_PROMPT as the instruction, and
-#    select_tools(config.RETRIEVAL_MODE) as its tools. Assign it to root_agent."
+# root_agent の構築 (Gemini 3.8 Flash)
 # ===========================================================================
-root_agent = None  # <-- replace this with your LlmAgent(...)
+root_agent = LlmAgent(
+    name="hr_enterprise_agent",
+    model=config.GEMINI_MODEL,
+    description="Altostrat Enterprise HR Assistant for policies, WorkWeek HCM, and ServiceImmediately ITSM.",
+    instruction=POLICY_AGENT_PROMPT,
+    tools=select_tools(config.RETRIEVAL_MODE),
+)
 
 
 # ---------------------------------------------------------------------------
-# GIVEN: a tiny CLI runner so you can talk to the agent from the terminal.
+# CLI ランナー & セッション管理
 # ---------------------------------------------------------------------------
 _session_service = None
 
@@ -69,29 +112,34 @@ def _ensure_runner():
     global _session_service
     if root_agent is None:
         raise SystemExit(
-            "root_agent is None — implement the TODO block in agent/agent.py first."
+            "root_agent is None — agent/agent.py で root_agent を構築してください。"
         )
     if _session_service is None:
         _session_service = InMemorySessionService()
     return Runner(app_name=config.APP_NAME, agent=root_agent, session_service=_session_service)
 
 
-async def _ensure_session_async(user_id, session_id):
-    """Create the session via the async API (the *_sync helpers are deprecated)."""
+async def _ensure_session_async(user_id: str, session_id: str):
+    """非同期 API 経由でセッションを作成します。"""
     try:
         await _session_service.create_session(
             app_name=config.APP_NAME, user_id=user_id, session_id=session_id
         )
     except Exception:
-        pass  # already exists
+        pass  # 既存セッション
 
 
-async def _run_query_traced_async(query, user_id, session_id):
+async def _run_query_traced_async(query: str, user_id: str, session_id: str):
     from google.genai import types
+
+    # 入力ガードレール検査
+    is_safe, guarded_query = apply_input_guardrail(query)
+    if not is_safe:
+        return guarded_query, [{"tool": "input_guardrail", "payload": {"blocked": True}}]
 
     runner = _ensure_runner()
     await _ensure_session_async(user_id, session_id)
-    message = types.Content(role="user", parts=[types.Part(text=query)])
+    message = types.Content(role="user", parts=[types.Part(text=guarded_query)])
     final = ""
     evidence = []
     async for event in runner.run_async(
@@ -107,31 +155,25 @@ async def _run_query_traced_async(query, user_id, session_id):
             texts = [p.text for p in event.content.parts if getattr(p, "text", None)]
             if texts:
                 final = "\n".join(texts)
+
+    # 出力ガードレール検査（PIIマスキング）
+    final = apply_output_guardrail(final)
     return final, evidence
 
 
 def run_query(query: str, user_id: str = "learner", session_id: str = "session-1") -> str:
+    """エージェントにクエリを送信し、回答文字列を取得します。"""
     answer, _evidence = run_query_traced(query, user_id=user_id, session_id=session_id)
     return answer
 
 
 def run_query_traced(query: str, user_id: str = "learner", session_id: str = "session-1"):
-    """Like run_query, but also returns the evidence the agent retrieved.
-
-    Returns (answer, evidence) where evidence is a list of
-    {"tool": <tool name>, "payload": <the tool's return value>} — i.e. exactly
-    what each retrieval tool handed back to the model. The eval harness uses this
-    to check *grounding* (did the answer stick to what was retrieved?).
-
-    Drives the async ADK APIs (run_async + async create_session) under
-    asyncio.run, so callers stay synchronous without hitting the deprecated
-    sync Runner.run / *_sync session methods.
-    """
+    """エージェントにクエリを送信し、(回答, 実行証跡evidence) を取得します。"""
     return asyncio.run(_run_query_traced_async(query, user_id, session_id))
 
 
 def _interactive():
-    print(f"HR Policy Agent [{config.RETRIEVAL_MODE}] — type 'exit' to quit.")
+    print(f"Enterprise HR Agent [{config.RETRIEVAL_MODE} | {config.GEMINI_MODEL}] — 'exit' で終了。")
     while True:
         try:
             q = input("\nyou > ").strip()
@@ -150,7 +192,7 @@ def main(argv=None):
     elif argv:
         print(run_query(" ".join(argv)))
     else:
-        print('Usage: uv run python -m agent.agent "<question>"  |  --interactive')
+        print('使用法: uv run python -m agent.agent "<質問または指示>"  |  --interactive')
 
 
 if __name__ == "__main__":

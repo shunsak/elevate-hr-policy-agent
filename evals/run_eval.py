@@ -444,6 +444,7 @@ def main():
                     help="grader model; default is stronger than the agent so it doesn't share its blind spots")
     ap.add_argument("--self-consistency", type=int, default=1, help="judge N times, take median")
     ap.add_argument("--compare-modes", action="store_true", help="run okf and rag side by side")
+    ap.add_argument("--output-json", default=None, help="path to save full evaluation results as eval.json")
     ap.add_argument("--verbose", "-v", action="store_true",
                     help="verbose progress logging to stderr (DEBUG level)")
     args = ap.parse_args()
@@ -464,23 +465,40 @@ def main():
     log.info("eval file=%s | cases=%d | subset=%s | target=%s | judge=%s | modes=%s",
              args.eval_file, len(cases), args.subset, args.target, args.judge_model, modes)
     summaries = {}
+    last_results = []
     for mode in modes:
         log.info("starting retrieval mode=%s", mode)
         os.environ["RETRIEVAL_MODE"] = mode
         # reload config + agent so the mode change takes effect
-        for m in ("agent.config", "agent.agent"):
-            sys.modules.pop(m, None)
+        for m in list(sys.modules.keys()):
+            if m == "agent" or m.startswith("agent."):
+                sys.modules.pop(m, None)
         log.info("reloading agent/config for mode=%s (target=%s)", mode, args.target)
         runner = load_agent(args.target)
         print(f"\n===== mode={mode} | target={args.target} | judge={args.judge_model} | subset={args.subset} =====")
         results = run_suite(cases, rubric, runner, args.judge_model, args.self_consistency)
+        last_results = results
         summary = print_report(results, mode, args.target, rubric)
         if summary:
             summaries[mode] = summary
             log.info("mode=%s TOTAL %.1f / 100", mode, summary["total"])
 
+    if args.output_json:
+        out_payload = {
+            "eval_suite": data.get("name", "HR Agent Eval"),
+            "target": args.target,
+            "judge_model": args.judge_model,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "summary": summaries.get(modes[0], {}),
+            "results": last_results,
+        }
+        with open(args.output_json, "w") as ofh:
+            json.dump(out_payload, ofh, indent=2, ensure_ascii=False)
+        print(f"\n[INFO] Successfully saved full evaluation deliverable to {args.output_json}")
+
     if not args.compare_modes and summaries:
         show_delta_and_save(summaries[modes[0]], modes[0], args.target)
+
     if args.compare_modes and len(summaries) == 2:
         print("\n===== okf vs rag =====")
         for cid in summaries["okf"]["per_case"]:
