@@ -1,0 +1,232 @@
+{
+  "eval_cases": [
+    {
+      "eval_case_id": "uc_2_1_equipment_procurement",
+      "agent_data": {
+        "agents": {
+          "hr_enterprise_agent": {
+            "agent_id": "hr_enterprise_agent",
+            "agent_type": "AutonomousOrchestrator",
+            "instruction": "Orchestrate multi-step enterprise workflows across Policy Handbook, WorkWeek HCM, and ServiceImmediately ITSM with strict grounding and transactional safety."
+          }
+        },
+        "turns": [
+          {
+            "turn_index": 0,
+            "events": [
+              {
+                "author": "user",
+                "content": {
+                  "role": "user",
+                  "parts": [
+                    {
+                      "text": "I read the remote work policy and I think I'm eligible for a home office monitor. Can you check my remote work status for employee EMP001 and order a monitor for me?"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Cross-system orchestration: 1. Checks handbook policy for remote equipment cap ($500). 2. Calls get_employee_profile to verify remote eligibility and delivery address. 3. Calls create_incident_ticket in ServiceImmediately for hardware delivery. 4. Returns confirmation with ticket ID and Section 5.4 citation."
+            }
+          ]
+        }
+      },
+      "context": "Authoritative Policy Sections: 5.4",
+      "rubric_groups": {
+        "correctness": {
+          "name": "correctness",
+          "criteria": "Evaluate correctness strictly against ground truth and policy context."
+        },
+        "grounding": {
+          "name": "grounding",
+          "criteria": "Evaluate grounding strictly against ground truth and policy context."
+        },
+        "reasoning": {
+          "name": "reasoning",
+          "criteria": "Evaluate reasoning strictly against ground truth and policy context."
+        },
+        "citation": {
+          "name": "citation",
+          "criteria": "Evaluate citation strictly against ground truth and policy context."
+        }
+      }
+    },
+    {
+      "eval_case_id": "uc_2_2_sick_leave_delegation",
+      "agent_data": {
+        "agents": {
+          "hr_enterprise_agent": {
+            "agent_id": "hr_enterprise_agent",
+            "agent_type": "AutonomousOrchestrator",
+            "instruction": "Orchestrate multi-step enterprise workflows across Policy Handbook, WorkWeek HCM, and ServiceImmediately ITSM with strict grounding and transactional safety."
+          }
+        },
+        "turns": [
+          {
+            "turn_index": 0,
+            "events": [
+              {
+                "author": "user",
+                "content": {
+                  "role": "user",
+                  "parts": [
+                    {
+                      "text": "I need to take 3 days of sick leave starting next Monday for employee EMP001. Can you explain the policy, submit the sick leave in WorkWeek, and create a ticket to delegate my emails to my manager?"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Cross-system orchestration: 1. Explains MC deadline within 48h. 2. Calls submit_leave_request for 3 sick days. 3. Calls create_incident_ticket with category='Access' to delegate emails to manager (Sarah Jenkins). 4. Cites Section 1.1 / 19.4."
+            }
+          ]
+        }
+      },
+      "context": "Authoritative Policy Sections: 1.1, 19.4",
+      "rubric_groups": {
+        "correctness": {
+          "name": "correctness",
+          "criteria": "Evaluate correctness strictly against ground truth and policy context."
+        },
+        "grounding": {
+          "name": "grounding",
+          "criteria": "Evaluate grounding strictly against ground truth and policy context."
+        },
+        "reasoning": {
+          "name": "reasoning",
+          "criteria": "Evaluate reasoning strictly against ground truth and policy context."
+        },
+        "citation": {
+          "name": "citation",
+          "criteria": "Evaluate citation strictly against ground truth and policy context."
+        }
+      }
+    },
+    {
+      "eval_case_id": "uc_2_3_relocation_badge",
+      "agent_data": {
+        "agents": {
+          "hr_enterprise_agent": {
+            "agent_id": "hr_enterprise_agent",
+            "agent_type": "AutonomousOrchestrator",
+            "instruction": "Orchestrate multi-step enterprise workflows across Policy Handbook, WorkWeek HCM, and ServiceImmediately ITSM with strict grounding and transactional safety."
+          }
+        },
+        "turns": [
+          {
+            "turn_index": 0,
+            "events": [
+              {
+                "author": "user",
+                "content": {
+                  "role": "user",
+                  "parts": [
+                    {
+                      "text": "I am transferring to the London office as employee EMP001. What is my relocation allowance, please update my address to 10 Downing Street London, and request an office access badge for me."
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Cross-system orchestration: 1. Quotes relocation allowance policy for international transfer. 2. Calls update_contact_info to update address in WorkWeek. 3. Calls create_incident_ticket for facilities access badge. 4. Cites Section 8.2."
+            }
+          ]
+        }
+      },
+      "context": "Authoritative Policy Sections: 8.2",
+      "rubric_groups": {
+        "correctness": {
+          "name": "correctness",
+          "criteria": "Evaluate correctness strictly against ground truth and policy context."
+        },
+        "grounding": {
+          "name": "grounding",
+          "criteria": "Evaluate grounding strictly against ground truth and policy context."
+        },
+        "reasoning": {
+          "name": "reasoning",
+          "criteria": "Evaluate reasoning strictly against ground truth and policy context."
+        },
+        "citation": {
+          "name": "citation",
+          "criteria": "Evaluate citation strictly against ground truth and policy context."
+        }
+      }
+    },
+    {
+      "eval_case_id": "saga_compensation_rollback",
+      "agent_data": {
+        "agents": {
+          "hr_enterprise_agent": {
+            "agent_id": "hr_enterprise_agent",
+            "agent_type": "AutonomousOrchestrator",
+            "instruction": "Orchestrate multi-step enterprise workflows and trigger compensating transactions (cancel_leave_request) if subsequent steps fail."
+          }
+        },
+        "turns": [
+          {
+            "turn_index": 0,
+            "events": [
+              {
+                "author": "user",
+                "content": {
+                  "role": "user",
+                  "parts": [
+                    {
+                      "text": "Book 3 days sick leave for EMP001 and create an email forwarding delegation ticket. If ticket creation fails, rollback the leave booking."
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "If ServiceImmediately ticket creation fails after WorkWeek leave submission, execute cancel_leave_request to preserve transactional consistency and inform user."
+            }
+          ]
+        }
+      },
+      "context": "Authoritative Policy: Section 1.1 / Section 19.4; Saga Compensation Pattern",
+      "rubric_groups": {
+        "reasoning": {
+          "name": "reasoning",
+          "criteria": "Verifies that cancel_leave_request was invoked when ticket creation fails."
+        },
+        "grounding": {
+          "name": "grounding",
+          "criteria": "Zero hallucinated success confirmations."
+        }
+      }
+    }
+  ]
+}
